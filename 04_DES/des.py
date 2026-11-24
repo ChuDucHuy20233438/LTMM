@@ -32,3 +32,53 @@ def feistel_function(right, round_key):
 
     # Buoc 4: Hoan vi P
     return permute(sbox_output, P, 32)
+def des_encrypt(plaintext, key):
+    """
+    Ma hoa mot khoi du lieu 64 bit bang DES.
+    """
+
+    # Sinh 16 khoa vong
+    round_keys = generate_round_keys(key)
+
+    # Hoan vi ban dau IP
+    permuted = permute(plaintext, IP, 64)
+
+    # Chia thanh hai nua 32 bit
+    left, right = split_block(permuted, 32)
+
+    # Thuc hien 16 vong Feistel
+    for round_key in round_keys:
+        left, right = right, left ^ feistel_function(right, round_key)
+
+    # Hoan doi hai nua sau vong 16
+    combined = (right << 32) | left
+
+    # Hoan vi nguoc IP
+    ciphertext = permute(combined, IP_INV, 64)
+
+    return ciphertext
+def des_decrypt(ciphertext, key):
+    """
+    Giai ma mot khoi du lieu 64 bit bang DES.
+    """
+
+    # Sinh 16 khoa vong va dao nguoc thu tu
+    round_keys = generate_round_keys(key)[::-1]
+
+    # Hoan vi ban dau IP
+    permuted = permute(ciphertext, IP, 64)
+
+    # Chia thanh hai nua 32 bit
+    left, right = split_block(permuted, 32)
+
+    # Thuc hien 16 vong Feistel voi khoa vong dao nguoc
+    for round_key in round_keys:
+        left, right = right, left ^ feistel_function(right, round_key)
+
+    # Hoan doi hai nua
+    combined = (right << 32) | left
+
+    # Hoan vi nguoc IP
+    plaintext = permute(combined, IP_INV, 64)
+
+    return plaintext
