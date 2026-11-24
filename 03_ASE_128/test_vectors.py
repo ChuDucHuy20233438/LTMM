@@ -66,3 +66,60 @@ class TestAES128(unittest.TestCase):
             round_keys[1].hex().upper(),
             "D6AA74FDD2AF72FADAA678F1D6AB76FE"
         )
+
+    def test_shift_rows(self):
+        """Kiem tra phep dich hang."""
+        from aes import shift_rows
+
+        state = [
+            [0, 1, 2, 3],
+            [4, 5, 6, 7],
+            [8, 9, 10, 11],
+            [12, 13, 14, 15]
+        ]
+
+        expected = [
+            [0, 1, 2, 3],
+            [5, 6, 7, 4],
+            [10, 11, 8, 9],
+            [15, 12, 13, 14]
+        ]
+
+        self.assertEqual(shift_rows(state), expected)
+
+    def test_mix_columns(self):
+        """Kiem tra phep tron cot."""
+        from aes import mix_columns
+
+        state = [
+            [0xDB, 0, 0, 0],
+            [0x13, 0, 0, 0],
+            [0x53, 0, 0, 0],
+            [0x45, 0, 0, 0]
+        ]
+
+        expected = [
+            [0x8E, 0, 0, 0],
+            [0x4D, 0, 0, 0],
+            [0xA1, 0, 0, 0],
+            [0xBC, 0, 0, 0]
+        ]
+
+        self.assertEqual(mix_columns(state), expected)
+
+    def test_aes128_encryption(self):
+        """Kiem tra ma hoa AES-128 bang vector chuan."""
+        from main import encrypt_block_hex
+
+        plaintext = "00112233445566778899AABBCCDDEEFF"
+        key = "000102030405060708090A0B0C0D0E0F"
+
+        expected = "69C4E0D86A7B0430D8CDB78070B4C55A"
+
+        ciphertext = encrypt_block_hex(plaintext, key)
+
+        self.assertEqual(ciphertext, expected)
+
+
+if __name__ == "__main__":
+    unittest.main()
