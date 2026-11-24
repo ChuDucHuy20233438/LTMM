@@ -1,0 +1,158 @@
+
+
+"""
+grain.py - Cài đặt mã dòng Grain v1 và Grain-128.
+
+Ký hiệu (giống README.md):
+    s : LFSR, danh sách bit s[0], s[1], ...
+    b : NFSR, danh sách bit b[0], b[1], ...
+    z : bit keystream
+
+Mỗi nhịp, thanh ghi bỏ bit đầu s[0] và thêm 1 bit mới vào cuối.
+"""
+
+
+# ===== Đổi byte <-> bit =====
+
+def bytes_to_bits(data, lsb_first=True):
+    """b'\\x01' -> [1,0,0,0,0,0,0,0] (LSB-first) hoặc [0,0,0,0,0,0,0,1] (MSB-first)."""
+    order = range(8) if lsb_first else range(7, -1, -1)
+    return [(byte >> i) & 1 for byte in data for i in order]
+
+
+def bits_to_bytes(bits, lsb_first=True):
+    """Ngược lại của bytes_to_bits."""
+    order = list(range(8)) if lsb_first else list(range(7, -1, -1))
+    result = []
+    for k in range(0, len(bits), 8):
+        byte = 0
+        for bit, i in zip(bits[k:k + 8], order):
+            byte |= bit << i
+        result.append(byte)
+    return bytes(result)
+
+# ===== Grain v1: LFSR =====
+
+def lfsr_feedback(s):
+    """Hàm f: bit mới của LFSR."""
+    return s[0] ^ s[13] ^ s[23] ^ s[38] ^ s[51] ^ s[62]
+
+
+# ===== Grain v1: NFSR =====
+
+def nfsr_feedback(b, s0):
+    """Hàm g: bit mới của NFSR (cộng thêm bit s0 của LFSR)."""
+    return (s0 ^ b[0] ^ b[9] ^ b[14] ^ b[21] ^ b[28] ^ b[33] ^ b[37]
+            ^ b[45] ^ b[52] ^ b[60] ^ b[62]
+            ^ (b[63] & b[60]) ^ (b[37] & b[33]) ^ (b[15] & b[9])
+            ^ (b[60] & b[52] & b[45]) ^ (b[33] & b[28] & b[21])
+            ^ (b[63] & b[45] & b[28] & b[9]) ^ (b[60] & b[52] & b[37] & b[33])
+            ^ (b[63] & b[60] & b[21] & b[15])
+            ^ (b[63] & b[60] & b[52] & b[45] & b[37])
+            ^ (b[33] & b[28] & b[21] & b[15] & b[9])
+            ^ (b[52] & b[45] & b[37] & b[33] & b[28] & b[21]))
+# ===== Grain v1: hàm đầu ra =====
+
+def h(x0, x1, x2, x3, x4):
+    """Hàm lọc h (5 bit vào, 1 bit ra)."""
+    return (x1 ^ x4 ^ (x0 & x3) ^ (x2 & x3) ^ (x3 & x4)
+            ^ (x0 & x1 & x2) ^ (x0 & x2 & x3) ^ (x0 & x2 & x4)
+            ^ (x1 & x2 & x4) ^ (x2 & x3 & x4))
+
+
+def output_bit(s, b):
+    """Bit keystream z."""
+    return (b[1] ^ b[2] ^ b[4] ^ b[10] ^ b[31] ^ b[43] ^ b[56]
+            ^ h(s[3], s[25], s[46], s[64], b[63]))
+# ===== Lớp GrainV1 =====
+
+class GrainV1:
+    """Grain v1: khóa 10 byte (80 bit), IV 8 byte (64 bit)."""
+
+    KEY_BYTES = 10
+    IV_BYTES = 8
+    INIT_CLOCKS = 160
+    LSB_FIRST = True
+
+    def __init__(self, key, iv, init_clocks=None):
+        """init_clocks: để trống = dùng số nhịp chuẩn. Chỉ giảm khi thử tấn công."""
+        if len(key) != self.KEY_BYTES:
+            raise ValueError(f"Khóa phải dài {self.KEY_BYTES} byte (đang là {len(key)})")
+        if len(iv) != self.IV_BYTES:
+            raise ValueError(f"IV phải dài {self.IV_BYTES} byte (đang là {len(iv)})")
+
+        # Nạp khóa vào NFSR; nạp IV vào LFSR, các ô còn lại điền bit 1
+        self.b = bytes_to_bits(key, self.LSB_FIRST)
+        iv_bits = bytes_to_bits(iv, self.LSB_FIRST)
+        self.s = iv_bits + [1] * (len(self.b) - len(iv_bits))
+
+     # Khởi tạo: chạy nhiều nhịp, XOR bit z vào cả hai thanh ghi, không xuất ra
+        if init_clocks is None:
+            init_clocks = self.INIT_CLOCKS
+        for _ in range(init_clocks):
+            self.clock(extra=self.output())
+
+
+    def feedback(self):
+      """Bit mới cho (LFSR, NFSR)."""
+      return lfsr_feedback(self.s), nfsr_feedback(self.b, self.s[0])
+
+    def output(self):
+      return output_bit(self.s, self.b)
+
+    def clock(self, extra=0):
+        """Dịch cả hai thanh ghi 1 nhịp. extra = z khi khởi tạo, = 0 khi sinh keystream."""
+        new_s, new_b = self.feedback()
+        self.s = self.s[1:] + [new_s ^ extra]
+        self.b = self.b[1:] + [new_b ^ extra]
+
+    def next_bit(self):
+        """Lấy 1 bit keystream."""
+        z = self.output()
+        self.clock()
+        return z
+
+    def keystream(self, n_bytes):
+        bits = [self.next_bit() for _ in range(8 * n_bytes)]
+        return bits_to_bytes(bits, self.LSB_FIRST)
+
+    def encrypt(self, data):
+        """Bản mã = bản rõ XOR keystream. Giải mã làm y hệt."""
+        ks = self.keystream(len(data))
+        return bytes(d ^ k for d, k in zip(data, ks))
+
+    decrypt = encrypt
+
+# ===== Grain-128  =====
+
+def lfsr128_feedback(s):
+    return s[0] ^ s[7] ^ s[38] ^ s[70] ^ s[81] ^ s[96]
+
+def nfsr128_feedback(b, s0):
+    return (s0 ^ b[0] ^ b[26] ^ b[56] ^ b[91] ^ b[96]
+            ^ (b[3] & b[67]) ^ (b[11] & b[13]) ^ (b[17] & b[18])
+            ^ (b[27] & b[59]) ^ (b[40] & b[48]) ^ (b[61] & b[65])
+            ^ (b[68] & b[84]))
+def output_bit128(s, b):
+    h128 = ((b[12] & s[8]) ^ (s[13] & s[20]) ^ (b[95] & s[42])
+            ^ (s[60] & s[79]) ^ (b[12] & b[95] & s[95]))
+    return (b[2] ^ b[15] ^ b[36] ^ b[45] ^ b[64] ^ b[73] ^ b[89]
+            ^ h128 ^ s[93])
+
+
+class Grain128(GrainV1):
+    """Grain-128: giống Grain v1, chỉ khác kích thước, công thức và thứ tự bit."""
+
+    KEY_BYTES = 16
+    IV_BYTES = 12
+    INIT_CLOCKS = 256
+    LSB_FIRST = False
+
+    def feedback(self):
+        return lfsr128_feedback(self.s), nfsr128_feedback(self.b, self.s[0])
+
+    def output(self):
+        return output_bit128(self.s, self.b)
+
+
+CIPHERS = {"v1": GrainV1, "128": Grain128}
