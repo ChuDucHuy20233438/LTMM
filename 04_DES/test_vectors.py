@@ -22,3 +22,27 @@ def test_key_schedule():
     assert round_keys[0] == 0x1B02EFFC7072
 
     print("[PASS] Key schedule")
+    def test_encryption():
+    """Kiem tra ket qua ma hoa DES."""
+
+    ciphertext = des_encrypt(
+        STANDARD_PLAINTEXT,
+        STANDARD_KEY
+    )
+
+    assert ciphertext == STANDARD_CIPHERTEXT
+
+    print("[PASS] DES encryption")
+    print(f"       Ciphertext: {ciphertext:016X}")
+    def test_decryption():
+    """Kiem tra kha nang giai ma DES."""
+
+    plaintext = des_decrypt(
+        STANDARD_CIPHERTEXT,
+        STANDARD_KEY
+    )
+
+    assert plaintext == STANDARD_PLAINTEXT
+
+    print("[PASS] DES decryption")
+    print(f"       Plaintext: {plaintext:016X}")
