@@ -23,7 +23,7 @@ def test_key_schedule():
 
     print("[PASS] Key schedule")
     def test_encryption():
-    """Kiem tra ket qua ma hoa DES."""
+        """Kiem tra ket qua ma hoa DES."""
 
     ciphertext = des_encrypt(
         STANDARD_PLAINTEXT,
@@ -35,7 +35,7 @@ def test_key_schedule():
     print("[PASS] DES encryption")
     print(f"       Ciphertext: {ciphertext:016X}")
     def test_decryption():
-    """Kiem tra kha nang giai ma DES."""
+        """Kiem tra kha nang giai ma DES."""
 
     plaintext = des_decrypt(
         STANDARD_CIPHERTEXT,
@@ -46,3 +46,39 @@ def test_key_schedule():
 
     print("[PASS] DES decryption")
     print(f"       Plaintext: {plaintext:016X}")
+    def test_project_vector():
+        """Kiem tra vector du lieu cua du an."""
+
+    ciphertext = des_encrypt(
+        PROJECT_PLAINTEXT,
+        PROJECT_KEY
+    )
+
+    decrypted = des_decrypt(
+        ciphertext,
+        PROJECT_KEY
+    )
+
+    assert decrypted == PROJECT_PLAINTEXT
+
+    print("[PASS] Project test vector")
+    print(f"       Plaintext : {PROJECT_PLAINTEXT:016X}")
+    print(f"       Key       : {PROJECT_KEY:016X}")
+    print(f"       Ciphertext: {ciphertext:016X}")
+    print(f"       Decrypted : {decrypted:016X}")
+def run_all_tests():
+    """Chay tat ca cac truong hop kiem thu."""
+
+    print("========== DES TESTS ==========")
+
+    test_key_schedule()
+    test_encryption()
+    test_decryption()
+    test_project_vector()
+
+    print("================================")
+    print("All tests passed!")
+
+
+if __name__ == "__main__":
+    run_all_tests()
