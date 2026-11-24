@@ -1,0 +1,26 @@
+========== DES EXPERIMENTAL RESULTS ==========
+
+1. Project Test Vector
+
+Plaintext (P): 0000000000000011
+Key (K):       0000000000000000
+
+Encryption:
+Ciphertext (C): 799A09FB40DF6019
+
+Decryption:
+Recovered Plaintext: 0000000000000011
+
+Result: PASS
+
+
+2. Test Summary
+
+[PASS] Key schedule
+[PASS] DES encryption
+[PASS] DES decryption
+[PASS] Project test vector
+
+All tests passed.
+
+=============================================
